@@ -1,0 +1,124 @@
+# -*- mode: ruby -*-
+# vi: set ft=ruby :
+
+# All Vagrant configuration is done below. The "2" in Vagrant.configure
+# configures the configuration version (we support older styles for
+# backwards compatibility). Please don't change it unless you know what
+# you're doing.
+Vagrant.configure(2) do |config|
+  # The most common configuration options are documented and commented below.
+  # For a complete reference, please see the online documentation at
+  # https://docs.vagrantup.com.
+
+  # Every Vagrant development environment requires a box. You can search for
+  # boxes at https://atlas.hashicorp.com/search.
+  config.vm.box = "http://mirrors.ustc.edu.cn/centos-cloud/centos/7/vagrant/x86_64/images/CentOS-7-x86_64-Vagrant-1802_01.VirtualBox.box"
+
+  # Disable automatic box update checking. If you disable this, then
+  # boxes will only be checked for updates when the user runs
+  # `vagrant box outdated`. This is not recommended.
+  # config.vm.box_check_update = false
+
+  # Create a forwarded port mapping which allows access to a specific port
+  # within the machine from a port on the host machine. In the example below,
+  # accessing "localhost:8080" will access port 80 on the guest machine.
+  # config.vm.network "forwarded_port", guest: 80, host: 8080
+
+  # Create a private network, which allows host-only access to the machine
+  # using a specific IP.
+  # config.vm.network "private_network", ip: "192.168.33.10"
+
+  # Create a public network, which generally matched to bridged network.
+  # Bridged networks make the machine appear as another physical device on
+  # your network.
+  # config.vm.network "public_network"
+
+  # Share an additional folder to the guest VM. The first argument is
+  # the path on the host to the actual folder. The second argument is
+  # the path on the guest to mount the folder. And the optional third
+  # argument is a set of non-required options.
+  # config.vm.synced_folder "../data", "/vagrant_data"
+
+  # Provider-specific configuration so you can fine-tune various
+  # backing providers for Vagrant. These expose provider-specific options.
+  # Example for VirtualBox:
+  #
+  # config.vm.provider "virtualbox" do |vb|
+  #   # Display the VirtualBox GUI when booting the machine
+  #   vb.gui = true
+  #
+  #   # Customize the amount of memory on the VM:
+  #   vb.memory = "1024"
+  # end
+  #
+  # View the documentation for the provider you are using for more
+  # information on available options.
+
+  # Define a Vagrant Push strategy for pushing to Atlas. Other push strategies
+  # such as FTP and Heroku are also available. See the documentation at
+  # https://docs.vagrantup.com/v2/push/atlas.html for more information.
+  # config.push.define "atlas" do |push|
+  #   push.app = "YOUR_ATLAS_USERNAME/YOUR_APPLICATION_NAME"
+  # end
+
+  # Enable provisioning with a shell script. Additional provisioners such as
+  # Puppet, Chef, Ansible, Salt, and Docker are also available. Please see the
+  # documentation for more information about their specific syntax and use.
+  # config.vm.provision "shell", inline: <<-SHELL
+  #   sudo apt-get update
+  #   sudo apt-get install -y apache2
+  # SHELL
+
+  #设置 VM的内存/名字
+  config.vm.provider "virtualbox" do |v|
+   v.customize ["modifyvm", :id, "--name", "centos7_docker", "--memory", "512"]
+  end
+  
+  #设置host-only ip地址
+   config.vm.network :private_network, ip: "172.168.56.2"
+
+  #hostname设置
+  config.vm.hostname = "docker.centos.thepy.cn"
+
+  #/vagrant目录默认就是当前的开发目录，这是在虚拟机开启的时候默认挂载同步的。
+  #我们还可以通过配置来设置额外的同步目录：
+  config.vm.synced_folder  "~/PycharmProjects", "/vagrant"
+ 
+  #端口转发
+  #这一行的意思是把对host机器上8080端口的访问请求forward到虚拟机的80端口的服务上，
+  #例如你在你的虚拟机上使用nginx跑了一个Go应用，
+  #那么你在host机器上的浏览器中打开http://localhost:8080时，
+  #Vagrant就会把这个请求转发到VM里面跑在80端口的nginx服务上，
+  #因此我们可以通过这个设置来帮助我们去设定host和VM之间，或是VM和VM之间的信息交互。
+  #config.vm.network :forwarded_port, guest: 80, host: 8080
+
+  #自动安装开发环境环境
+  config.vm.provision "shell", inline: <<-SHELL
+    sudo yum -y install yum-utils device-mapper-persistent-data lvm2
+    sudo yum-config-manager \
+        --add-repo='https://mirrors.ustc.edu.cn/docker-ce/linux/centos/docker-ce.repo'
+    sudo  yum-config-manager --enable docker-ce-stable
+    sudo yum makecache fast
+    sudo yum install -y docker-ce-17.12.1.ce
+    sudo mkdir -p /etc/docker
+    sudo tee /etc/docker/daemon.json <<-'EOF'
+{
+  "registry-mirrors": ["https://atr83yso.mirror.aliyuncs.com"]
+}
+EOF
+
+    sudo tee -a /etc/sysctl.conf <<-EOF
+net.bridge.bridge-nf-call-ip6tables = 1
+net.bridge.bridge-nf-call-iptables = 1
+EOF
+    sudo sysctl -p
+    sudo systemctl daemon-reload
+    sudo systemctl restart docker
+    sudo systemctl enable docker
+    sudo systemctl start docker
+    sudo groupadd docker
+    sudo usermod -aG docker $USER
+    sudo sync;reboot
+  SHELL
+
+end
